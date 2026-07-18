@@ -35,6 +35,9 @@ class BaseWWTask(BaseTask):
         self.char_config = self.get_global_config('Character Config')
         self.key_config = self.get_global_config('Game Hotkey')  # 游戏热键配置
         self.next_monthly_card_start = 0
+        # Keep login progress per task instance. Multi-account login must not
+        # inherit the global login state from the account that just logged out.
+        self._logged_in = False
         self.scene: WWScene | None = None
 
     @property
@@ -680,7 +683,7 @@ class BaseWWTask(BaseTask):
 
     def ensure_main(self, esc=True, time_out=30):
         self.info_set('current task', f'wait main esc={esc}')
-        if not self.logged_in:
+        if not self._logged_in:
             time_out = 600
         if not self.wait_until(lambda: self.is_main(esc=esc), time_out=time_out, raise_if_not_found=False):
             raise Exception('Please start in game world and in team!')
@@ -689,21 +692,21 @@ class BaseWWTask(BaseTask):
 
     def is_main(self, esc=True):
         if self.in_team_and_world():
-            self.logged_in = True
+            self._logged_in = True
             return True
         if self.wait_login():
             return False
         if self.handle_monthly_card():
             return False
-        if esc:
+        if esc and self._logged_in:
             self.log_debug('main esc')
             self.back(after_sleep=2)
             return False
 
     def wait_login(self):
-        if not self.logged_in:
+        if not self._logged_in:
             if self.in_team_and_world():
-                self.logged_in = True
+                self._logged_in = True
                 return True
             self.handle_monthly_card()
             if login_close := self.find_one('login_close', horizontal_variance=0.15, vertical_variance=0.1):
@@ -904,7 +907,7 @@ class BaseWWTask(BaseTask):
             else:
                 exist_count += 1
         if exist_count == 2 or exist_count == 1:
-            self.logged_in = True
+            self._logged_in = True
             return True, current, exist_count + 1
         else:
             return False, -1, exist_count + 1
