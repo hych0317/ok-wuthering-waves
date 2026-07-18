@@ -1,10 +1,12 @@
 import math
 import re
 import time
+import ctypes
 from datetime import datetime, timedelta
 from typing import List
 
 import numpy as np
+import win32gui
 
 from ok import BaseTask, Logger, find_boxes_by_name, og, find_color_rectangles, mask_white
 from ok import CannotFindException
@@ -356,6 +358,24 @@ class BaseWWTask(BaseTask):
             down_time = 0.2
         return super().click(x, y, move_back, name, interval, move=move, down_time=down_time, after_sleep=after_sleep,
                              key=key)
+
+    def real_click_monthly_card_relative(self, x, y, after_sleep=0):
+        hwnd = self.hwnd.hwnd
+        try:
+            win32gui.SetForegroundWindow(hwnd)
+        except Exception:
+            pass
+        _, _, client_w, client_h = win32gui.GetClientRect(hwnd)
+        client_x, client_y = win32gui.ClientToScreen(hwnd, (0, 0))
+        abs_x = client_x + int(client_w * x)
+        abs_y = client_y + int(client_h * y)
+        ctypes.windll.user32.SetCursorPos(abs_x, abs_y)
+        self.sleep(0.05)
+        ctypes.windll.user32.mouse_event(2, 0, 0, 0, 0)
+        self.sleep(0.05)
+        ctypes.windll.user32.mouse_event(4, 0, 0, 0, 0)
+        if after_sleep > 0:
+            self.sleep(after_sleep)
 
     def check_for_monthly_card(self):
         if self.should_check_monthly_card():
@@ -915,25 +935,58 @@ class BaseWWTask(BaseTask):
         # Function to check if a component forms a ring
 
     def find_monthly_card(self):
-        return self.find_one('monthly_card', threshold=0.65, horizontal_variance=0.05, vertical_variance=0.05)
+        monthly_card = self.find_one('monthly_card', threshold=0.8)
+        try:
+            texts = self.ocr(box=self.box_of_screen(0.25, 0.55, 0.75, 0.95), log=getattr(self, 'debug', False))
+        except Exception as e:
+            logger.debug(f'monthly_card ocr failed {e}')
+            return monthly_card
+        monthly_card_text = self.find_boxes(texts, match=re.compile(r'(月相观测|观测卡|点击领取今日|剩余.{0,8}天)'))
+        if monthly_card_text:
+            self.log_info(f'monthly_card found by ocr {monthly_card_text}')
+            return monthly_card_text
+        return monthly_card
+
+    def find_monthly_card_reward_popup(self):
+        try:
+            texts = self.ocr(box=self.box_of_screen(0.30, 0.15, 0.70, 0.90), log=getattr(self, 'debug', False))
+        except Exception as e:
+            logger.debug(f'monthly_card reward ocr failed {e}')
+            return None
+        return self.find_boxes(texts, match=re.compile(r'(点击空白区域关闭|空白区域关闭)'))
 
     def handle_monthly_card(self):
         monthly_card = self.find_monthly_card()
-        # self.screenshot('monthly_card1')
+        if monthly_card is None and self.find_monthly_card_reward_popup():
+            self.log_info('monthly_card reward popup found click')
+            for _ in range(3):
+                self.real_click_monthly_card_relative(0.50, 0.75, after_sleep=1)
+                if self.find_monthly_card_reward_popup():
+                    continue
+                if self.in_team_and_world():
+                    self.set_check_monthly_card(next_day=True)
+                    return True
+                return False
+            self.log_info('monthly_card reward popup still visible after click')
+            return False
         if monthly_card is not None:
-            # self.screenshot('monthly_card1')
             self.log_info('monthly_card found click')
-            self.click_relative(0.50, 0.89)
-            self.sleep(2)
-            # self.screenshot('monthly_card2')
-            self.click_relative(0.50, 0.89)
-            self.sleep(2)
-            self.wait_until(self.in_team_and_world, time_out=10,
-                            post_action=lambda: self.click_relative(0.50, 0.89, after_sleep=1))
-            # self.screenshot('monthly_card3')
-            self.set_check_monthly_card(next_day=True)
-        # logger.debug(f'check_monthly_card {monthly_card}')
-        return monthly_card is not None
+            deadline = time.time() + 10
+            while time.time() < deadline:
+                self.real_click_monthly_card_relative(0.50, 0.88, after_sleep=1)
+                if self.find_monthly_card() is not None:
+                    continue
+                if self.find_monthly_card_reward_popup():
+                    self.log_info('monthly_card reward popup found click')
+                    self.real_click_monthly_card_relative(0.50, 0.75, after_sleep=1)
+                    continue
+                if self.wait_until(self.in_team_and_world, time_out=5, raise_if_not_found=False,
+                                   post_action=lambda: self.real_click_monthly_card_relative(0.50, 0.75,
+                                                                                             after_sleep=1)):
+                    self.set_check_monthly_card(next_day=True)
+                    return True
+            self.log_info('monthly_card still visible after click')
+        return False
 
     @property
     def game_lang(self):
