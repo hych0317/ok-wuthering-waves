@@ -30,6 +30,7 @@ ok/
 *.pyx
 *.so
 *.bat
+!okww_start-daily.bat
 .vscode/
 **/__pycache__/
 # Distribution / packaging
@@ -71,3 +72,10 @@ working_images/
 repo/
 
 assets/result.json
+
+# Local launcher and Windows state
+.okww_last_run
+.okww_last_run.tmp
+desktop.ini
+.pytest_cache/
+pytest-cache-files-*/

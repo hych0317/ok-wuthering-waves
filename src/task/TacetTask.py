@@ -1,6 +1,6 @@
 from qfluentwidgets import FluentIcon
 
-from ok import Logger
+from ok import CannotFindException, Logger
 from src.task.BaseCombatTask import BaseCombatTask, CharRevivedException
 from src.task.WWOneTimeTask import WWOneTimeTask
 
@@ -20,8 +20,7 @@ class TacetTask(WWOneTimeTask, BaseCombatTask):
         default_config = {
             'Which Tacet Suppression to Farm': 1,  # starts with 1
         }
-        self.structure = [2, 5, 5, 7]
-        self.total_number = sum(self.structure)
+        self.total_number = 17
         self.target_enemy_time_out = 10
         default_config.update(self.default_config)
         self.config_description = {
@@ -56,47 +55,88 @@ class TacetTask(WWOneTimeTask, BaseCombatTask):
         else:
             must_use = 0
         self.info_incr('used stamina', 0)
+        fail_count = 0
+        direct_challenge = False
         while True:
             self.sleep(1)
-            self.openF2Book("gray_book_boss")
-            current, back_up, total = self.get_stamina()
-            if current == -1:
-                self.click_relative(0.04, 0.4, after_sleep=1)
+            if not direct_challenge:
+                self.openF2Book("gray_book_boss")
                 current, back_up, total = self.get_stamina()
-            if total < self.stamina_once:
-                return self.not_enough_stamina()
+                if current == -1:
+                    self.click_relative(0.04, 0.4, after_sleep=1)
+                    current, back_up, total = self.get_stamina()
+                if total < self.stamina_once:
+                    return self.not_enough_stamina()
 
-            self.open_boss_book('wuyin')
-            index = config.get('Which Tacet Suppression to Farm', 1) - 1
-            self.teleport_to_tacet(index)
-            self.click_team_challenge()
-            while True:
+                self.open_boss_book('wuyin')
+                index = config.get('Which Tacet Suppression to Farm', 1) - 1
+                direct_challenge = bool(self.teleport_to_tacet(index))
+                self.click_team_challenge()
+            try:
                 self.wait_in_team_and_world(time_out=120)
                 self.combat_once(target=True)
+                self.sleep(3)
                 self.walk_to_treasure()
                 self.pick_f(handle_claim=False)
-                if not self.has_claim_stamina():
-                    self.click(0.352, 0.624, after_sleep=1)
-                    self.log_info('is not claim treasure, restart challenge')
+            except CharRevivedException:
+                direct_challenge = False
+                self.log_info('farm_tacet: death recovered, re-enter from F2 book')
+                continue
+            except Exception as e:
+                fail_count += 1
+                self.log_error(f'farm_tacet: Exception, retry fail_count:{fail_count}', e)
+                if fail_count <= 3:
                     continue
-                can_continue, used = self.use_stamina(once=self.stamina_once, must_use=must_use)
-                self.info_incr('used stamina', used)
-                self.sleep(4)
-                if not can_continue:
-                    self.click(0.365, 0.853)
+                raise
+
+            fail_count = 0
+            can_continue, used = self.use_tacet_stamina(must_use)
+            self.info_incr('used stamina', used)
+            self.sleep(4)
+            if not can_continue:
+                if direct_challenge:
+                    self.log_info('used all stamina, leave direct Tacet challenge')
+                    self.click(0.42, 0.84, after_sleep=2)
                     self.wait_in_team_and_world(time_out=120)
-                    return None
-                else:
-                    self.click(0.640, 0.851, after_sleep=3)
-                must_use -= used
+                    return
+                return self.not_enough_stamina()
+
+            must_use -= used
+            if direct_challenge:
+                self.click(0.68, 0.84, after_sleep=1)
+                if confirm := self.wait_feature(
+                        ['confirm_btn_hcenter_vcenter', 'confirm_btn_highlight_hcenter_vcenter'],
+                        raise_if_not_found=False,
+                        threshold=0.6,
+                        time_out=2):
+                    self.click(0.49, 0.55, after_sleep=0.5)
+                    self.click(confirm, after_sleep=0.5)
+                    self.wait_click_feature(
+                        ['confirm_btn_hcenter_vcenter', 'confirm_btn_highlight_hcenter_vcenter'],
+                        relative_x=-1, raise_if_not_found=False,
+                        threshold=0.6,
+                        time_out=1)
+                self.wait_in_team_and_world(time_out=120)
+                self.sleep(1)
+                continue
+            self.click(0.51, 0.84, after_sleep=3)
 
     def not_enough_stamina(self, back=True):
         self.log_info(f"used all stamina")
         if back:
             self.back(after_sleep=1)
 
+    def use_tacet_stamina(self, must_use):
+        for attempt in range(1, 4):
+            try:
+                return self.use_stamina(once=self.stamina_once, must_use=must_use)
+            except CannotFindException:
+                self.log_warning(f'cannot read stamina on reward page, retry {attempt}/3')
+                self.sleep(1)
+        raise CannotFindException('cannot read stamina on Tacet reward page')
+
     def teleport_to_tacet(self, index):
         self.info_set('Teleport to Tacet Suppression', index)
         if index >= self.total_number:
             raise IndexError(f'Index out of range, max is {self.total_number}')
-        return self.click_on_book_target(index + 1, self.total_number, self.structure)
+        return self.click_on_book_target(index + 1, self.total_number)

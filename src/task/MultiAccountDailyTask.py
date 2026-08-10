@@ -2,6 +2,7 @@ import ctypes
 import json
 import os
 import re
+import threading
 
 import numpy as np
 import win32gui
@@ -12,6 +13,7 @@ from qfluentwidgets import FluentIcon
 from qfluentwidgets import ComboBox
 
 from ok import Logger, og
+from ok.gui.Communicate import communicate
 from ok.gui.tasks.ConfigLabelAndWidget import ConfigLabelAndWidget
 from src.task.DailyTask import DailyTask
 from src.task.WWOneTimeTask import WWOneTimeTask
@@ -180,11 +182,19 @@ class MultiAccountDailyTask(WWOneTimeTask, BaseCombatTask):
         return self.config.get('使用桌面截图', False)
 
     def run(self):
+        try:
+            self._run_multi_account_daily()
+        except Exception:
+            self._quit_failed_daily_launcher_instance()
+            raise
+
+    def _run_multi_account_daily(self):
         WWOneTimeTask.run(self)
         accounts = self._parse_account_list()
 
         if not accounts:
             self._run_daily_for_account(None)
+            self._mark_daily_launcher_success()
             return
 
         detected = self._switch_to_login_and_detect()
@@ -208,6 +218,7 @@ class MultiAccountDailyTask(WWOneTimeTask, BaseCombatTask):
             self.log_info(f'剩余账号：{", ".join(f"****{item}" for item in remaining) or "无"}')
 
         self.log_info('所有账号一条龙已完成')
+        self._mark_daily_launcher_success()
 
         if self.config.get('全部完成后退出'):
             if in_game:
@@ -222,6 +233,29 @@ class MultiAccountDailyTask(WWOneTimeTask, BaseCombatTask):
         else:
             self.log_info('无法识别当前账号，改为从账号列表逐个选择执行')
         return list(accounts)
+
+    def _mark_daily_launcher_success(self):
+        marker_path = os.environ.get('OKWW_DAILY_RUN_MARKER')
+        run_date = os.environ.get('OKWW_DAILY_RUN_DATE')
+        if not marker_path or not run_date:
+            return
+
+        temp_path = f'{marker_path}.tmp'
+        with open(temp_path, 'w', encoding='utf-8') as marker:
+            marker.write(f'{run_date}\n')
+        os.replace(temp_path, marker_path)
+        self.log_info(f'已记录每日自动启动成功日期：{run_date}')
+
+    def _quit_failed_daily_launcher_instance(self):
+        marker_path = os.environ.get('OKWW_DAILY_RUN_MARKER')
+        run_date = os.environ.get('OKWW_DAILY_RUN_DATE')
+        if not marker_path or not run_date:
+            return
+
+        self.log_info('每日自动启动任务异常，关闭后台实例以允许后续重试')
+        quit_timer = threading.Timer(1.0, communicate.quit.emit)
+        quit_timer.daemon = True
+        quit_timer.start()
 
     def _add_account_config_options(self):
         accounts = self._read_configured_accounts()
@@ -640,6 +674,16 @@ class MultiAccountDailyTask(WWOneTimeTask, BaseCombatTask):
             selected_account[0] = selected
         return selected == suffix
 
+    def _ensure_account_switch_overlay(self, time_out=30):
+        state = self._detect_login_page_state(time_out=3)
+        if state == 'account_switch_overlay':
+            return True
+
+        self.log_info(
+            f'选择账号前页面状态为 {state or "unknown"}，重新打开账号切换面板'
+        )
+        return self._advance_login_page_to_account_switch(time_out=time_out)
+
     def _login_selected_account(self, suffix):
         self.log_info(f'正在登录当前选中账号{f"：****{suffix}" if suffix else ""}')
         texts = self._login_ocr()
@@ -653,6 +697,7 @@ class MultiAccountDailyTask(WWOneTimeTask, BaseCombatTask):
             self._login_dialog_click(box_cx - client_w // 2, box_cy - client_h // 2, after_sleep=3)
         else:
             self._click_center_offset(0, 95, after_sleep=3)
+        self.logged_in = False
         self._logged_in = False
         self.ensure_main(time_out=180)
         self.log_info(f'登录成功{f"：****{suffix}" if suffix else ""}')
@@ -705,12 +750,28 @@ class MultiAccountDailyTask(WWOneTimeTask, BaseCombatTask):
             for attempt in range(1, max_retries + 1):
                 if attempt > 1:
                     self.log_info(f'账号 ****{suffix} 未切换成功，重试选择（{attempt - 1}/{max_retries - 1}）')
+
+                if not self._ensure_account_switch_overlay(time_out=30):
+                    self.log_info(f'账号 ****{suffix} 选择前无法恢复账号切换面板')
+                    continue
+
                 self.sleep(1)
+                state = self._login_page_state()
+                if state != 'account_switch_overlay':
+                    self.log_info(f'账号切换面板状态发生变化：{state or "unknown"}，准备恢复后重试')
+                    continue
+
                 self._click_center_offset(270, -43, after_sleep=1)
-                self.wait_until(
+                if not self.wait_until(
                     lambda: self._click_account_in_list(suffix),
-                    time_out=10, raise_if_not_found=True
-                )
+                    time_out=10, raise_if_not_found=False
+                ):
+                    state = self._detect_login_page_state(time_out=2)
+                    self.log_info(
+                        f'账号列表中未找到 ****{suffix}，当前页面状态：{state or "unknown"}'
+                    )
+                    continue
+
                 if self.wait_until(
                     lambda: self._selected_account_matches(suffix, selected_account),
                     time_out=5, raise_if_not_found=False
@@ -720,10 +781,11 @@ class MultiAccountDailyTask(WWOneTimeTask, BaseCombatTask):
             else:
                 selected = selected_account[0]
                 raise Exception(
-                    f'Failed to select account ****{suffix} after {max_retries - 1} retries, '
+                    f'Failed to select account ****{suffix} after {max_retries} attempts, '
                     f'current selected account is {f"****{selected}" if selected else "unknown"}'
                 )
             self._click_login_button()
+            self.logged_in = False
             self._logged_in = False
             self.ensure_main(time_out=180)
             self.log_info(f'登录成功：****{suffix}')

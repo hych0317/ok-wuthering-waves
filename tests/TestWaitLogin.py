@@ -19,6 +19,7 @@ class FakeLoginTask:
     def __init__(self, frames):
         self.frames = list(frames)
         self.logged_in = False
+        self._logged_in = False
         self.debug = False
         self.clicked = []
         self.slept = []
@@ -62,6 +63,33 @@ class FakeLoginTask:
 
 
 class TestWaitLogin(unittest.TestCase):
+
+    def test_ensure_main_inherits_global_login_state_for_child_task(self):
+        class FakeChildTask:
+            logged_in = True
+            _logged_in = False
+
+            def __init__(self):
+                self.local_state_seen_by_wait = None
+                self.timeout_seen_by_wait = None
+
+            def info_set(self, *args):
+                pass
+
+            def wait_until(self, condition, time_out, raise_if_not_found):
+                self.local_state_seen_by_wait = self._logged_in
+                self.timeout_seen_by_wait = time_out
+                return True
+
+            def sleep(self, timeout):
+                pass
+
+        task = FakeChildTask()
+
+        BaseWWTask.ensure_main(task, time_out=180)
+
+        self.assertTrue(task.local_state_seen_by_wait)
+        self.assertEqual(task.timeout_seen_by_wait, 180)
 
     def test_transient_login_button_is_not_clicked(self):
         # Global server auto login: the login button disappears by itself,
