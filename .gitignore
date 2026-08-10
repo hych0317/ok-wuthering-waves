@@ -1,5 +1,6 @@
 .venv
 onnxocr/
+ok_tasks/
 updates/
 working/
 update/
@@ -40,6 +41,7 @@ tests/logs/
 i18n/en_US/
 logs/
 build/
+site/
 develop-eggs/
 dist/
 downloads/
@@ -79,3 +81,4 @@ assets/result.json
 desktop.ini
 .pytest_cache/
 pytest-cache-files-*/
+src/gui/CharacterCodeTab.py

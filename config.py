@@ -13,7 +13,110 @@ from src.task.process_feature import process_feature
 version = "dev"
 
 
+def _find_most_recently_run_pc_exe():
+    try:
+        import codecs
+        import struct
+        import winreg
+    except ImportError:
+        return None
+
+    user_assist_key = r"Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist"
+    candidates = []
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, user_assist_key) as root:
+            for index in range(winreg.QueryInfoKey(root)[0]):
+                guid = winreg.EnumKey(root, index)
+                try:
+                    with winreg.OpenKey(root, fr"{guid}\Count") as count_key:
+                        for value_index in range(winreg.QueryInfoKey(count_key)[1]):
+                            encoded_path, data, _ = winreg.EnumValue(count_key, value_index)
+                            path = os.path.expandvars(codecs.decode(encoded_path, "rot_13"))
+                            if not path.casefold().endswith(r"\wuthering waves.exe"):
+                                continue
+                            if not Path(path).is_file():
+                                continue
+                            last_run = struct.unpack_from("<Q", data, 60)[0] if len(data) >= 68 else 0
+                            candidates.append((last_run, path))
+                except OSError:
+                    continue
+    except OSError:
+        return None
+
+    return max(candidates, default=(0, None))[1]
+
+
+def _find_pc_exe_from_registry():
+    try:
+        import winreg
+    except ImportError:
+        return None
+
+    uninstall_key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+    registry_views = (winreg.KEY_WOW64_64KEY, winreg.KEY_WOW64_32KEY)
+
+    for root in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+        for view in registry_views:
+            try:
+                with winreg.OpenKey(root, uninstall_key, 0, winreg.KEY_READ | view) as key:
+                    subkey_count = winreg.QueryInfoKey(key)[0]
+                    for index in range(subkey_count):
+                        try:
+                            subkey_name = winreg.EnumKey(key, index)
+                            with winreg.OpenKey(key, subkey_name) as subkey:
+                                display_name = _read_registry_value(subkey, "DisplayName", winreg)
+                                if not _is_wuthering_waves_registry_entry(subkey_name, display_name):
+                                    continue
+                                for value_name in (
+                                        "InstallPath", "InstallLocation", "LauncherPath",
+                                        "DisplayIcon", "UninstallString"):
+                                    registered_path = _read_registry_value(subkey, value_name, winreg)
+                                    if game_exe := _find_pc_exe_near_registered_path(registered_path):
+                                        return game_exe
+                        except OSError:
+                            continue
+            except OSError:
+                continue
+    return None
+
+
+def _read_registry_value(key, name, winreg):
+    try:
+        return str(winreg.QueryValueEx(key, name)[0])
+    except OSError:
+        return ""
+
+
+def _is_wuthering_waves_registry_entry(subkey_name, display_name):
+    names = f"{subkey_name} {display_name}".casefold()
+    return "wuthering waves" in names or "鸣潮" in names or "鳴潮" in names
+
+
+def _find_pc_exe_near_registered_path(registered_path):
+    if not registered_path:
+        return None
+
+    path_text = os.path.expandvars(registered_path.strip().strip('"'))
+    exe_end = path_text.casefold().find(".exe")
+    if exe_end >= 0:
+        path_text = path_text[:exe_end + 4]
+
+    registered = Path(path_text)
+    install_folder = registered.parent if registered.suffix.casefold() == ".exe" else registered
+    candidates = (
+        install_folder / "Wuthering Waves.exe",
+        install_folder / "Wuthering Waves Game" / "Wuthering Waves.exe",
+        install_folder.parent / "Wuthering Waves Game" / "Wuthering Waves.exe",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
 def calculate_pc_exe_path(running_path):
+    if running_path is None:
+        return _find_most_recently_run_pc_exe() or _find_pc_exe_from_registry()
     game_exe_folder = Path(running_path).parents[3]
     return str(game_exe_folder / "Wuthering Waves.exe")
 
@@ -33,7 +136,10 @@ key_config_option = ConfigOption('Game Hotkey', {
     'Dodge Key': 'lshift',
     'Wheel Key': 'tab',
     'Guidebook Key': 'f2',
-}, description='In Game Hotkey for Skills', show_at_tab=True, icon=FluentIcon.GAME)
+    'Bag Key': 'b',
+}, description='In Game Hotkey for Skills', config_description={
+    'Bag Key': 'In-game hotkey used to open the Bag.',
+}, show_at_tab=True, icon=FluentIcon.GAME)
 
 char_config_option = ConfigOption('Character Config', {
     'Iuno C6': False,
@@ -50,10 +156,11 @@ monthly_card_config_option = ConfigOption('Monthly Card Config', {
 
 config = {
     'debug': False,  # Optional, default: False
+    'custom_tasks': True,
     'use_gui': True,
     'config_folder': 'configs',
     'blur_area': blur_area,
-    'gui_icon': 'icon.png',
+    'gui_icon': 'icons/icon.png',
     'global_configs': [key_config_option, char_config_option, monthly_card_config_option],
     'custom_tabs': [["src.gui.CharacterCodeTab", "CharacterCodeTab"]],
     'ocr': {
@@ -74,8 +181,13 @@ config = {
         'default_vertical_variance': 0.002,
         'default_threshold': 0.8,
         'feature_processor': process_feature,
-        'vcenter_features': ['monthly_card'],
-        'hcenter_features': ['monthly_card']
+        'vcenter_features': ['monthly_card', 'skip_dialog_check'],
+        'hcenter_features': ['monthly_card', 'suisui_forte3', 'message_dialog', 'claim_stamina_sign',
+                             'skip_dialog_check', 'login_close', 'garden_confirm', 'garden_continue_game',
+                             'garden_unpause', 'garden_get_gold', 'garden_get_purple', 'garden_get_skip',
+                             'garden_not_interested_confirm', 'garden_not_interested', 'a_garden_back',
+                             'garden_get_confirm_gray', 'the_garden_max', 'garden_shop_close', 'garden_new_stage',
+                             'a_garden_restart', 'suisui_forte2', 'suisui_e1', 'e_forte', 'f_break_full']
     },
     'windows': {  # required  when supporting windows game
         'top_hwnd_class': [re.compile('CAgreementDlg'), re.compile('CLoginDlg_P_'),
@@ -109,14 +221,14 @@ config = {
             'discord': 'https://discord.gg/vVyCatEBgA',
             'sponsor': 'https://patreon.com/ok_oldking',
             'share': 'Download OK-WW from https://github.com/ok-oldking/ok-wuthering-waves/releases/latest',
-            'faq': 'https://github.com/ok-oldking/ok-wuthering-waves/blob/master/README_en.md'
+            'faq': 'https://ok-oldking.github.io/ok-wuthering-waves/en/'
         },
         'zh_CN': {
             'github': 'https://github.com/ok-oldking/ok-wuthering-waves',
             'discord': 'https://discord.gg/vVyCatEBgA',
             'sponsor': 'https://afdian.com/a/ok-oldking',
-            'share': 'GitHub: https://github.com/ok-oldking 百度网盘: https://pan.baidu.com/s/102Mh1djq2B1T-cIJhct9Gg?pwd=okww 夸克网盘: https://pan.quark.cn/s/418018ddf7a0 Mirror酱：https://mirrorchyan.com/zh/projects?source=okbilibili',
-            'faq': 'https://cnb.cool/ok-oldking/ok-wuthering-waves/-/blob/main/README.md',
+            'share': 'GitHub: https://github.com/ok-oldking 百度网盘: https://pan.baidu.com/s/102Mh1djq2B1T-cIJhct9Gg?pwd=okww 夸克网盘: https://pan.quark.cn/s/d080413c87ac Mirror酱：https://mirrorchyan.com/zh/projects?source=okbilibili',
+            'faq': 'https://ok-oldking.github.io/ok-wuthering-waves/zh-CN/',
             'qq_group': 'https://qm.qq.com/q/SUQpIpmq4',
             'qq_channel': 'https://pd.qq.com/s/djmm6l44y',
         },
@@ -142,13 +254,13 @@ config = {
     'version': version,
     'onetime_tasks': [  # tasks to execute
         ["src.task.DailyTask", "DailyTask"],
-        ["src.task.MultiAccountDailyTask", "MultiAccountDailyTask"],
         ["src.task.FarmEchoTask", "FarmEchoTask"],
-        ["src.task.AutoRogueTask", "AutoRogueTask"],
-        ["src.task.ForgeryTask", "ForgeryTask"],
         ["src.task.NightmareNestTask", "NightmareNestTask"],
-        ["src.task.SimulationTask", "SimulationTask"],
         ["src.task.TacetTask", "TacetTask"],
+        ["src.task.ForgeryTask", "ForgeryTask"],
+        ["src.task.SimulationTask", "SimulationTask"],
+        ["src.task.MultiAccountDailyTask", "MultiAccountDailyTask"],
+        ["src.task.MergeEchoTask", "MergeEchoTask"],
         ["src.task.EnhanceEchoTask", "EnhanceEchoTask"],
         ["src.task.ChangeEchoTask", "ChangeEchoTask"],
         ["src.task.GardenTask", "GardenTask"],
@@ -156,15 +268,15 @@ config = {
     ], 'trigger_tasks': [
         ["src.task.AutoCombatTask", "AutoCombatTask"],
         ["src.task.AutoPickTask", "AutoPickTask"],
-        ["src.task.SkipDialogTask", "AutoDialogTask"],
         ["src.task.AutoLoginTask", "AutoLoginTask"],
-        ["src.task.MouseResetTask", "MouseResetTask"],
+        ["src.task.SkipDialogTask", "AutoDialogTask"],
         ["src.task.FastTravelTask", "FastTravelTask"],
+        ["src.task.MouseResetTask", "MouseResetTask"],
     ], 'scene': ["src.scene.WWScene", "WWScene"],
     'update_pyappify': {
-        'to_version': '1.1.6',
-        'zip_url': 'https://github.com/ok-oldking/ok-wuthering-waves/releases/download/v3.3.74/ok-ww-win32.zip',
-        'sha256': 'ee8db613a5e026a2873adb2e147490c86333092bedf3230b10be3b9c574ad3b6',
+        'to_version': '1.1.9',
+        'zip_url': 'https://github.com/ok-oldking/ok-wuthering-waves/releases/download/v3.5.17/ok-ww-win32.zip',
+        'sha256': '0ad4d89aae5995641136eb977536a05d2f9c567c9a43ab16c670a947bc301531',
     }
 
 }

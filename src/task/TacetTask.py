@@ -1,4 +1,3 @@
-from qfluentwidgets import FluentIcon
 
 from ok import CannotFindException, Logger
 from src.task.BaseCombatTask import BaseCombatTask, CharRevivedException
@@ -11,11 +10,8 @@ class TacetTask(WWOneTimeTask, BaseCombatTask):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.icon = FluentIcon.FLAG
-        self.group_name = "Dungeon"
-        self.group_icon = FluentIcon.HOME
         self.description = "Farms the selected Tacet Suppression, until no stamina. Must be able to teleport (F2)."
-        self.name = "Tacet Suppression"
+        self.name = "🌊 Tacet Suppression"
         self.support_schedule_task = True
         default_config = {
             'Which Tacet Suppression to Farm': 1,  # starts with 1
@@ -78,6 +74,11 @@ class TacetTask(WWOneTimeTask, BaseCombatTask):
                 self.sleep(3)
                 self.walk_to_treasure()
                 self.pick_f(handle_claim=False)
+                self.sleep(2)
+                if not self.has_claim_stamina():
+                    self.esc_cancel()
+                    self.log_info('is not claim treasure, restart challenge')
+                    continue
             except CharRevivedException:
                 direct_challenge = False
                 self.log_info('farm_tacet: death recovered, re-enter from F2 book')
@@ -94,32 +95,18 @@ class TacetTask(WWOneTimeTask, BaseCombatTask):
             self.info_incr('used stamina', used)
             self.sleep(4)
             if not can_continue:
-                if direct_challenge:
-                    self.log_info('used all stamina, leave direct Tacet challenge')
-                    self.click(0.42, 0.84, after_sleep=2)
-                    self.wait_in_team_and_world(time_out=120)
-                    return
-                return self.not_enough_stamina()
+                self.log_info('used all stamina, leave Tacet challenge')
+                self.click_relative(0.365, 0.853, hcenter=True)
+                self.wait_in_team_and_world(time_out=120)
+                return
 
             must_use -= used
+            self.click_relative(0.640, 0.851, hcenter=True, after_sleep=0.2)
+            self.wait_click_skip_dialog_confirm()
             if direct_challenge:
-                self.click(0.68, 0.84, after_sleep=1)
-                if confirm := self.wait_feature(
-                        ['confirm_btn_hcenter_vcenter', 'confirm_btn_highlight_hcenter_vcenter'],
-                        raise_if_not_found=False,
-                        threshold=0.6,
-                        time_out=2):
-                    self.click(0.49, 0.55, after_sleep=0.5)
-                    self.click(confirm, after_sleep=0.5)
-                    self.wait_click_feature(
-                        ['confirm_btn_hcenter_vcenter', 'confirm_btn_highlight_hcenter_vcenter'],
-                        relative_x=-1, raise_if_not_found=False,
-                        threshold=0.6,
-                        time_out=1)
                 self.wait_in_team_and_world(time_out=120)
                 self.sleep(1)
                 continue
-            self.click(0.51, 0.84, after_sleep=3)
 
     def not_enough_stamina(self, back=True):
         self.log_info(f"used all stamina")

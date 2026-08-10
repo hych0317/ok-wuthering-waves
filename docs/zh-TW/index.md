@@ -1,28 +1,28 @@
 <div align="center">
   <h1 align="center">
-    <img src="icon.png" width="200" alt="ok-ww logo"/>
+    <img src="https://raw.githubusercontent.com/ok-oldking/ok-wuthering-waves/master/icons/icon.png" width="200" alt="ok-ww logo"/>
     <br/>
     ok-ww
   </h1> 
   
   <p>
-    一個基於圖像辨識的鳴潮自動化程式，支援背景執行，基於 <a href="https://github.com/ok-oldking/ok-script">ok-script</a> 開發。
+    一個基於圖像辨識的鳴潮自動化程式，支援背景執行，基於 <a href="https://ok-script.com">ok-script</a> 開發。
   </p>
   
   <p><i>透過 Windows 介面模擬使用者操作，無記憶體讀取、無檔案修改</i></p>
 </div>
 
 <!-- Badges -->
-<div align="center">
-  
-![平台](https://img.shields.io/badge/platform-Windows-blue)
-[![GitHub release](https://img.shields.io/github/v/release/ok-oldking/ok-wuthering-waves)](https://github.com/ok-oldking/ok-wuthering-waves/releases)
-[![總下載量](https://img.shields.io/github/downloads/ok-oldking/ok-wuthering-waves/total)](https://github.com/ok-oldking/ok-wuthering-waves/releases)
-[![Discord](https://img.shields.io/discord/296598043787132928?color=5865f2&label=%20Discord)](https://discord.gg/vVyCatEBgA)
-
+<div class="badge-row">
+  <img src="https://img.shields.io/badge/platform-Windows-blue" alt="平台" />
+  <a href="https://github.com/ok-oldking/ok-wuthering-waves/releases"><img src="https://img.shields.io/github/v/release/ok-oldking/ok-wuthering-waves" alt="GitHub release" /></a>
+  <a href="https://github.com/ok-oldking/ok-wuthering-waves/releases"><img src="https://img.shields.io/github/downloads/ok-oldking/ok-wuthering-waves/total" alt="總下載量" /></a>
+  <a href="https://discord.gg/vVyCatEBgA"><img src="https://img.shields.io/discord/296598043787132928?color=5865f2&amp;label=%20Discord" alt="Discord" /></a>
 </div>
 
-### [English Readme](README_en.md) | [中文说明](README.md) | 繁體中文說明 | [日本語Readme](README_ja.md)
+<p align="center"><strong>官方網站：</strong> <a href="https://ok-script.com/ok-ww">https://ok-script.com/ok-ww</a></p>
+
+### [English](../en/index.md) | [简体中文](../zh-CN/index.md) | 繁體中文 | [日本語](../ja/index.md)
 
 **示範與教學:** [![YouTube](https://img.shields.io/badge/YouTube-%23FF0000.svg?style=for-the-badge&logo=YouTube&logoColor=white)](https://youtu.be/h6P1KWjdnB4)
 
@@ -43,8 +43,8 @@
 
 ## 🚀 快速開始
 
-1.  **下載安裝檔**：從下方的「下載管道」下載最新的 `ok-ww-win32-setup.exe` 安裝檔。
-2.  **安裝程式**：雙擊 `ok-ww-win32-setup.exe` 檔案，並依照安裝精靈的指示完成安裝。
+1.  **下載安裝檔**：從下方的「下載管道」下載最新的 `ok-ww-win32-Global-setup.exe` 安裝檔。
+2.  **安裝程式**：雙擊 `ok-ww-win32-Global-setup.exe` 檔案，並依照安裝精靈的指示完成安裝。
 3.  **執行程式**：安裝完成後，從桌面捷徑或開始功能表啟動 `ok-ww` 即可。
 
 ## 📥 下載管道
@@ -54,7 +54,7 @@
 ## ✨ 主要功能
 <img width="1774" height="1182" alt="QQ_1762960844719" src="https://github.com/user-attachments/assets/c5eb0145-0d45-44f9-85b3-184de0ef20bf" />
 
-*   **高解析度支援**: 流暢執行於 4K 及以下所有 16:9 解析度（最低 1600x900）。部分功能相容 21:9 等超寬螢幕。
+*   **高解析度支援**: 流暢執行於 4K 及以下所有 16:9 解析度（最低 1280x720）。部分功能相容 21:9 等超寬螢幕。
 *   **背景模式**: 支援遊戲視窗最小化或被遮擋時在背景執行，不影響您使用電腦。
 *   **智慧辨識**: 全角色自動辨識，無需手動設定技能序列，一鍵啟動。
 *   **自動靜音**: 在背景執行時，可自動將遊戲靜音。
@@ -63,18 +63,19 @@
 
 如果遇到問題，請在提問前依以下步驟逐一排查：
 
-1.  **安裝路徑**：請確保軟體安裝在**純英文路徑**下（例如 `D:\Games\ok-ww`），不要安裝在 `C:\Program Files` 或包含中文字元的資料夾中。
-2.  **防毒軟體**：將軟體的安裝目錄加入您的防毒軟體（包括 Windows Defender）的**信任區或白名單**，以防檔案被誤刪或攔截。
-3.  **顯示設定**：
-    *   關閉所有顯示卡濾鏡（如 NVIDIA Game Filter）和銳化功能。
+1.  **防毒軟體**：將軟體的安裝目錄加入您的防毒軟體（包括 Windows Defender）的**信任區或白名單**，以防檔案被誤刪或攔截。
+2.  **顯示設定**：
+    *   一般可以開啟遊戲內濾鏡，但不能開啟顯示卡濾鏡，例如 NVIDIA RTX 動態亮麗、AMD 銳化。
     *   使用遊戲預設的亮度設定。
     *   關閉任何在遊戲畫面上顯示資訊的疊加層（如 MSI Afterburner、Fraps 等顯示的幀率）。
-4.  **自訂按鍵**：如果您修改了遊戲內的預設按鍵，請務必在 `ok-ww` 的設定中同步設定。僅支援設定中列出的按鍵。
-5.  **軟體版本**：檢查並確保您使用的是最新版本的 `ok-ww`。
-6.  **遊戲效能**：請確保遊戲能穩定以 **60 FPS** 執行。如果幀率不穩定，請嘗試調低遊戲畫質或解析度。
-7.  **遊戲斷線**：如果頻繁遇到與伺服器斷線的問題，可以先手動開啟遊戲執行 5 分鐘後再啟動本工具，或在斷線後直接重新登入，不要退出遊戲。
+3.  **自訂按鍵**：如果您修改了遊戲內的預設按鍵，請務必在 `ok-ww` 的設定中同步設定。僅支援設定中列出的按鍵。
+4.  **軟體版本**：檢查並確保您使用的是最新版本的 `ok-ww`。
+5.  **遊戲效能**：請確保遊戲能穩定以 **60 FPS** 執行。如果幀率不穩定，請嘗試調低遊戲畫質或解析度。
+6.  **遊戲斷線**：在 `ok-ww` 設定中開啟「啟動後關閉啟動器」，確保啟動器程序未在執行；或者使用原始碼執行。
+7.  **OpenVINO 錯誤**：如果遇到 `0x000005` 錯誤，並且使用的是配備 NPU 的 Intel CPU，請更新至 Intel 最新的 NPU 驅動程式。
 8.  **尋求協助**：如果以上步驟都無法解決您的問題，請透過社群管道提交詳細的錯誤回報。
 9.  **關閉自動奔跑**：在遊戲設定裡關閉自動奔跑。
+10. **為所有角色裝備主聲骸**：隊伍中的每個角色都必須裝備主聲骸（畫面右下角應顯示聲骸技能圖示）。任何一個角色未裝備主聲骸時，自動戰鬥將無法正常運作，並可能反覆鎖定敵人而不攻擊。
 
 ---
 
@@ -82,7 +83,7 @@
 
 ### 從原始碼執行 (Python)
 
-本專案僅支援 Python 3.12 版本。
+建議使用 Python 3.12。需要 Python 3.9 或以上版本，但其他版本尚未經過完整測試。
 
 ```bash
 # 安裝或更新相依套件
@@ -111,7 +112,7 @@ ok-ww.exe -t 1 -e
 
 *   **Discord**: [點擊加入](https://discord.gg/vVyCatEBgA)
 
-本專案基於 [ok-script](https://github.com/ok-oldking/ok-script) 框架開發，核心程式碼僅約 3000 行 (Python)，簡單易維護。歡迎有興趣的開發者使用 [ok-script](https://github.com/ok-oldking/ok-script) 開發您自己的自動化專案。
+本專案基於 [ok-script](https://ok-script.com) 框架開發，簡單易維護。歡迎有興趣的開發者使用 [ok-script](https://ok-script.com) 開發您自己的自動化專案。
 
 ## 🔗 使用 ok-script 的專案：
 
