@@ -104,7 +104,7 @@ git diff --name-only --diff-filter=U
 | `src/task/TacetTask.py` | 原仓库主分支 | 无音区数量上限 17、单次体力 60、直接挑战流程、战斗瞬时误退出重试、奖励页体力 OCR 重试、再次挑战和体力不足退出逻辑。需要结合主分支最新副本接口适配。 |
 | `src/task/BaseCombatTask.py` | 原仓库主分支 | 默认采用原仓库。只有能明确指出的本地战斗修复才逐块保留，不能整文件采用旧 `dev`。 |
 | `src/combat/**`、`src/char/**` | 原仓库主分支 | 与多账号无直接关系，默认采用主分支的新角色和战斗逻辑。 |
-| `config.py` | 原仓库主分支 | 确认 `MultiAccountDailyTask` 仍在一次性任务列表中。其他注册项使用主分支。 |
+| `config.py` | 原仓库主分支 | 确认 `MultiAccountDailyTask` 仍在一次性任务列表中。其他注册项使用主分支。每日启动脚本按类名动态解析任务序号，不得改回固定 `-t N`。 |
 | `assets/**`、`requirements*.txt`、`.github/**` | 原仓库主分支 | 默认使用原仓库，除非存在明确的本地资源或构建需求。 |
 | `i18n/**` | 两边合并 | 保留原仓库新增翻译，同时补齐本地新增配置和日志文本，不能整目录覆盖。 |
 | `tests/**` | 两边并集 | 保留原仓库测试，并保留登录状态、逐账号配置、无音区重试和奖励领取回归测试。 |
@@ -119,6 +119,9 @@ git diff --name-only --diff-filter=U
 - 批处理通过 `OKWW_DAILY_RUN_MARKER` 和 `OKWW_DAILY_RUN_DATE` 传递标记路径及游戏日期。
 - `/f` 可以跳过重复运行、网络和确认检查，但仍必须计算并传递游戏日期。
 - `/check` 只验证游戏日期、日志目录和 Conda 环境，不得启动游戏或任务，可用于排查开机环境差异。
+- 批处理必须从 `config.py` 的 `onetime_tasks` 中按类名动态解析 `MultiAccountDailyTask` 的 1-based 序号；不得硬编码 `-t 2`、`-t 7` 等会随上游任务顺序变化的编号。
+- `scripts/resolve_onetime_task_index.py` 属于每日启动协议的一部分，合并上游时必须保留；它只用标准库解析源码，不应通过导入 `config.py` 初始化 GUI 依赖。
+- `/check` 必须同时验证 `MultiAccountDailyTask` 已注册且能解析出有效序号，并在控制台及 `logs/okww-start-daily.log` 中记录当前映射。
 - 只有全部账号的日常流程完成后，`MultiAccountDailyTask` 才能原子写入运行标记。
 - 登录、账号选择或任一账号日常任务异常时，不得写入标记，否则当天后续自动启动会被错误跳过。
 - 由每日脚本启动的实例发生任务异常后，应在错误日志和截图生成后退出，不能留下无窗口 Python 进程占用单实例锁。

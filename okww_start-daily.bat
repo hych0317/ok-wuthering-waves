@@ -104,13 +104,29 @@ if errorlevel 1 (
 
 set "OKWW_DAILY_RUN_MARKER=%MARKER_FILE%"
 set "OKWW_DAILY_RUN_DATE=%TODAY%"
+set "TASK_INDEX="
+for /f "usebackq delims=" %%i in (`python scripts\resolve_onetime_task_index.py MultiAccountDailyTask`) do set "TASK_INDEX=%%i"
+if not defined TASK_INDEX (
+    echo [失败] 无法从 config.py 解析多账号任务序号。
+    >>"%LAUNCHER_LOG%" echo [%date% %time%] failed to resolve MultiAccountDailyTask index
+    pause
+    exit /b 1
+)
+if "%TASK_INDEX%"=="0" (
+    echo [失败] config.py 未注册 MultiAccountDailyTask。
+    >>"%LAUNCHER_LOG%" echo [%date% %time%] MultiAccountDailyTask is not registered
+    pause
+    exit /b 1
+)
+echo [任务] MultiAccountDailyTask 当前序号：%TASK_INDEX%
+>>"%LAUNCHER_LOG%" echo [%date% %time%] resolved MultiAccountDailyTask index=%TASK_INDEX%
 if /i "%~1"=="/check" (
-    echo [检查通过] 日期、日志目录和 conda 环境均可用。
-    >>"%LAUNCHER_LOG%" echo [%date% %time%] environment check passed
+    echo [检查通过] 日期、日志目录、conda 环境和任务映射均可用。
+    >>"%LAUNCHER_LOG%" echo [%date% %time%] environment and task mapping check passed
     exit /b 0
 )
 >>"%LAUNCHER_LOG%" echo [%date% %time%] starting python date=%TODAY%
-python main.py -t 2
+python main.py -t %TASK_INDEX%
 set "TASK_EXIT=%ERRORLEVEL%"
 >>"%LAUNCHER_LOG%" echo [%date% %time%] python exited code=%TASK_EXIT%
 
