@@ -7,7 +7,7 @@
 - `upstream`：原仓库 `ok-oldking/ok-wuthering-waves`，只拉取，不向其推送。
 - `origin`：个人 fork `<your-account>/ok-wuthering-waves`，开发分支推送到这里。
 - `upstream/master`：合并时使用的原仓库主分支。
-- `dev`：历史定制开发分支，包含多账号和其他本地改动，但整体代码可能落后于原仓库。
+- `dev`：已废弃并删除的历史开发分支；所需功能已迁移到 `upstream-multiaccount`，不应恢复为开发基线。
 - `upstream-multiaccount`：以原仓库主分支为基线、重新适配多账号功能的集成分支。后续合并优先以该分支或它的后继分支为目标，不要再直接复制旧 `dev` 的整个文件。
 
 不要使用本地 `master` 代替 `upstream/master`。本地 `master` 和 `origin/master` 都可能长期未更新。
